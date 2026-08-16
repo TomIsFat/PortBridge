@@ -11,3 +11,10 @@ release/
 *.db-wal
 .env
 .env.*
+
+# Local GitHub SSH helper files (do not commit)
+github_ed25519
+github_ed25519.pub
+github-ssh-env.sh
+ssh_config.github
+known_hosts.github
