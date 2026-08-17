@@ -1,6 +1,13 @@
 import { app, BrowserWindow, Menu, Tray, nativeImage } from 'electron';
 import { join } from 'node:path';
 import { createAppServices, registerIpcHandlers } from './ipc';
+import {
+  getTrayIconSize,
+  shouldCloseToTray,
+  shouldCreateTray,
+  shouldHideDockWhenHidingWindow,
+  shouldQuitOnLastWindow
+} from './trayPolicy';
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -35,26 +42,14 @@ function destroyTray(): void {
   tray = null;
 }
 
-function isLinuxTrayReliable(xdgCurrentDesktop = process.env.XDG_CURRENT_DESKTOP ?? ''): boolean {
-  const desktops = xdgCurrentDesktop.toLowerCase().split(':').filter(Boolean);
-  if (desktops.length === 0) return false;
-  return !desktops.includes('gnome');
-}
-
-function shouldCreateTray(): boolean {
-  if (process.platform === 'win32' || process.platform === 'darwin') return true;
-  if (process.platform === 'linux') return isLinuxTrayReliable();
-  return false;
-}
-
 function createTray(): void {
-  if (!shouldCreateTray()) return;
+  if (!shouldCreateTray(process.platform, process.env.XDG_CURRENT_DESKTOP)) return;
 
   try {
     const icon = nativeImage.createFromPath(getWindowIconPath());
     if (icon.isEmpty()) return;
 
-    const iconSize = process.platform === 'darwin' ? 22 : 16;
+    const iconSize = getTrayIconSize(process.platform);
     tray = new Tray(icon.resize({ width: iconSize, height: iconSize, quality: 'best' }));
     tray.setToolTip('PortBridge');
     tray.setContextMenu(
@@ -95,10 +90,10 @@ function createWindow(): void {
   });
 
   mainWindow.on('close', (event) => {
-    if (!isQuitting && tray) {
+    if (shouldCloseToTray(isQuitting, Boolean(tray))) {
       event.preventDefault();
       mainWindow?.hide();
-      if (process.platform === 'darwin') {
+      if (shouldHideDockWhenHidingWindow(process.platform)) {
         app.dock?.hide();
       }
     }
@@ -130,7 +125,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (!tray && process.platform !== 'darwin') {
+  if (shouldQuitOnLastWindow(Boolean(tray), process.platform)) {
     app.quit();
   }
 });

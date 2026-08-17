@@ -6,6 +6,7 @@ import type { ServerConfig, TunnelRuntimeState, TunnelStatus } from '../../share
 import { ServerRepository } from '../db/serverRepository';
 import { TunnelRepository } from '../db/tunnelRepository';
 import type { LogService } from './LogService';
+import { attachLocalForwardSocket } from './forwardSocket';
 
 interface RuntimeTunnel {
   tunnelId: string;
@@ -70,9 +71,7 @@ function createLocalForward(
   return new Promise((resolve, reject) => {
     const sockets = new Set<net.Socket>();
     const server = net.createServer((localSocket) => {
-      sockets.add(localSocket);
-      localSocket.once('close', () => sockets.delete(localSocket));
-      localSocket.on('error', () => localSocket.destroy());
+      attachLocalForwardSocket(localSocket, sockets);
       try {
         ssh.forwardOut(
           localSocket.remoteAddress || '127.0.0.1',
