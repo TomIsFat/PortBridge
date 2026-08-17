@@ -18,6 +18,9 @@ function setAppIcon(): void {
 }
 
 function showMainWindow(): void {
+  if (process.platform === 'darwin') {
+    app.dock?.show();
+  }
   if (!mainWindow) {
     createWindow();
     return;
@@ -37,7 +40,8 @@ function createTray(): void {
     const icon = nativeImage.createFromPath(getWindowIconPath());
     if (icon.isEmpty()) return;
 
-    tray = new Tray(icon.resize({ width: 16, height: 16 }));
+    const iconSize = process.platform === 'darwin' ? 22 : 16;
+    tray = new Tray(icon.resize({ width: iconSize, height: iconSize, quality: 'best' }));
     tray.setToolTip('PortBridge');
     tray.setContextMenu(
       Menu.buildFromTemplate([
@@ -80,6 +84,9 @@ function createWindow(): void {
     if (!isQuitting && tray) {
       event.preventDefault();
       mainWindow?.hide();
+      if (process.platform === 'darwin') {
+        app.dock?.hide();
+      }
     }
   });
 
