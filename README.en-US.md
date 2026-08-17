@@ -1,6 +1,6 @@
-
-
 # PortBridge
+
+English | [简体中文](README.md)
 
 PortBridge is a lightweight, cross-platform, locally private desktop client for SSH local port forwarding. It transforms the SSH local port forwarding workflow into a visual configuration interface. All server, authentication, and mapping configurations are stored on the user's own machine, without relying on cloud accounts or uploading data to third-party services. This allows developers, testers, and operations personnel to securely manage multiple servers and port mappings.
 
