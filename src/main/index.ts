@@ -35,7 +35,21 @@ function destroyTray(): void {
   tray = null;
 }
 
+function isLinuxTrayReliable(xdgCurrentDesktop = process.env.XDG_CURRENT_DESKTOP ?? ''): boolean {
+  const desktops = xdgCurrentDesktop.toLowerCase().split(':').filter(Boolean);
+  if (desktops.length === 0) return false;
+  return !desktops.includes('gnome');
+}
+
+function shouldCreateTray(): boolean {
+  if (process.platform === 'win32' || process.platform === 'darwin') return true;
+  if (process.platform === 'linux') return isLinuxTrayReliable();
+  return false;
+}
+
 function createTray(): void {
+  if (!shouldCreateTray()) return;
+
   try {
     const icon = nativeImage.createFromPath(getWindowIconPath());
     if (icon.isEmpty()) return;
