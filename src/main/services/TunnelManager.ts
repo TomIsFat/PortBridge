@@ -72,6 +72,7 @@ function createLocalForward(
     const server = net.createServer((localSocket) => {
       sockets.add(localSocket);
       localSocket.once('close', () => sockets.delete(localSocket));
+      localSocket.on('error', () => localSocket.destroy());
       try {
         ssh.forwardOut(
           localSocket.remoteAddress || '127.0.0.1',
