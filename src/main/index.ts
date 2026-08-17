@@ -7,15 +7,6 @@ let tray: Tray | null = null;
 let isQuitting = false;
 const services = createAppServices();
 
-process.on('uncaughtException', (error) => {
-  services.logService.error(`未捕获异常：${error instanceof Error ? error.message : String(error)}`);
-});
-
-process.on('unhandledRejection', (reason) => {
-  const message = reason instanceof Error ? reason.message : String(reason);
-  services.logService.error(`未处理的 Promise 异常：${message}`);
-});
-
 function getWindowIconPath(): string {
   return app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(process.cwd(), 'build/icon.png');
 }
@@ -36,24 +27,31 @@ function showMainWindow(): void {
   mainWindow.focus();
 }
 
-function createTray(): void {
-  const icon = nativeImage.createFromPath(getWindowIconPath());
-  tray = new Tray(icon.resize({ width: 16, height: 16 }));
-  tray.setToolTip('PortBridge');
+function destroyTray(): void {
+  tray?.destroy();
+  tray = null;
+}
 
-  const contextMenu = Menu.buildFromTemplate([
-    { label: '显示主界面', click: showMainWindow },
-    { type: 'separator' },
-    {
-      label: '退出',
-      click: () => {
-        app.quit();
-      }
-    }
-  ]);
-  tray.setContextMenu(contextMenu);
-  tray.on('click', showMainWindow);
-  tray.on('double-click', showMainWindow);
+function createTray(): void {
+  try {
+    const icon = nativeImage.createFromPath(getWindowIconPath());
+    if (icon.isEmpty()) return;
+
+    tray = new Tray(icon.resize({ width: 16, height: 16 }));
+    tray.setToolTip('PortBridge');
+    tray.setContextMenu(
+      Menu.buildFromTemplate([
+        { label: '显示主界面', click: showMainWindow },
+        { type: 'separator' },
+        { label: '退出', click: () => app.quit() }
+      ])
+    );
+    tray.on('click', showMainWindow);
+    tray.on('double-click', showMainWindow);
+  } catch (error) {
+    destroyTray();
+    services.logService.error(error instanceof Error ? error.message : '创建系统托盘失败');
+  }
 }
 
 function createWindow(): void {
@@ -79,7 +77,7 @@ function createWindow(): void {
   });
 
   mainWindow.on('close', (event) => {
-    if (!isQuitting) {
+    if (!isQuitting && tray) {
       event.preventDefault();
       mainWindow?.hide();
     }
@@ -111,14 +109,16 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  // 关闭窗口后保留在系统托盘继续运行，真正的退出由“退出”菜单或 before-quit 处理。
+  if (!tray && process.platform !== 'darwin') {
+    app.quit();
+  }
 });
 
-app.on('before-quit', (event) => {
+app.on('before-quit', async (event) => {
   if (isQuitting) return;
   isQuitting = true;
   event.preventDefault();
-  void services.tunnelManager.stopAll().finally(() => {
-    app.quit();
-  });
+  destroyTray();
+  await services.tunnelManager.stopAll();
+  app.exit(0);
 });
