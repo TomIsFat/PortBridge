@@ -24,6 +24,11 @@ function setAppIcon(): void {
   }
 }
 
+function hideWindowMenuBar(): void {
+  if (process.platform === 'darwin') return;
+  Menu.setApplicationMenu(null);
+}
+
 function showMainWindow(): void {
   if (process.platform === 'darwin') {
     app.dock?.show();
@@ -112,6 +117,7 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   setAppIcon();
+  hideWindowMenuBar();
   registerIpcHandlers(services);
   createWindow();
   createTray();
