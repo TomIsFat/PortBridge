@@ -30,6 +30,7 @@ The project itself maintains a clean Electron + React + TypeScript architecture,
 - Real-time Logs: View connection status, error reasons, and reconnection records within the app.
 - Configuration Migration: Supports configuration import/export, handling naming conflicts during import.
 - Data Maintenance: Supports clearing empty groups and deleting all local data.
+- System Tray: Closing the window keeps the app running in the tray, where you can restore the window or quit.
 
 ## Download and Installation
 
@@ -138,7 +139,7 @@ src
 
 - Add support for jump hosts or multi-hop SSH.
 - Add remote port forwarding, dynamic proxy, or SOCKS proxy support.
-- Add system tray integration, auto-start on boot, and global shortcuts.
+- Add auto-start on boot and global shortcuts.
 - Add configuration encryption, master password, or system keychain integration.
 - Add team configuration templates, bulk import, and environment duplication.
 - Add more log filtering, connection diagnostics, and export capabilities.
