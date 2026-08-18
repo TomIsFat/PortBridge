@@ -38,7 +38,7 @@ export function LogPanel() {
   }, [logs.length, collapsed]);
 
   return (
-    <section className={cn('absolute inset-x-0 bottom-0 z-20 overflow-hidden border-t bg-card/95 backdrop-blur transition-[height]', collapsed ? 'h-10' : 'h-[220px]')}>
+    <section className={cn('shrink-0 overflow-hidden border-t bg-card/95 backdrop-blur transition-[height]', collapsed ? 'h-10' : 'h-[220px]')}>
       <div className="flex h-10 items-center justify-between px-3">
         <div className="flex items-center gap-2 text-sm font-medium">
           <TerminalSquare className="h-4 w-4 text-muted-foreground" />

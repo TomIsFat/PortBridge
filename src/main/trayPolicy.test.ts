@@ -37,7 +37,7 @@ describe('isLinuxTrayReliable', () => {
 
 describe('getTrayIconSize', () => {
   it('uses a larger icon on macOS', () => {
-    assert.equal(getTrayIconSize('darwin'), 22);
+    assert.equal(getTrayIconSize('darwin'), 44);
     assert.equal(getTrayIconSize('win32'), 16);
     assert.equal(getTrayIconSize('linux'), 16);
   });
@@ -66,8 +66,8 @@ describe('shouldQuitOnLastWindow', () => {
 });
 
 describe('shouldHideDockWhenHidingWindow', () => {
-  it('hides the Dock only on macOS', () => {
-    assert.equal(shouldHideDockWhenHidingWindow('darwin'), true);
+  it('keeps the Dock visible so hiding the window does not look like a quit', () => {
+    assert.equal(shouldHideDockWhenHidingWindow('darwin'), false);
     assert.equal(shouldHideDockWhenHidingWindow('win32'), false);
     assert.equal(shouldHideDockWhenHidingWindow('linux'), false);
   });

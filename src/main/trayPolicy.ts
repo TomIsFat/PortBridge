@@ -11,7 +11,7 @@ export function shouldCreateTray(platform: string, xdgCurrentDesktop = ''): bool
 }
 
 export function getTrayIconSize(platform: string): number {
-  return platform === 'darwin' ? 22 : 16;
+  return platform === 'darwin' ? 44 : 16;
 }
 
 export function shouldCloseToTray(isQuitting: boolean, hasTray: boolean): boolean {
@@ -23,6 +23,6 @@ export function shouldQuitOnLastWindow(hasTray: boolean, platform: string): bool
   return !hasTray;
 }
 
-export function shouldHideDockWhenHidingWindow(platform: string): boolean {
-  return platform === 'darwin';
+export function shouldHideDockWhenHidingWindow(_platform: string): boolean {
+  return false;
 }

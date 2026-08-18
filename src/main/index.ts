@@ -52,10 +52,17 @@ function createTray(): void {
 
   try {
     const icon = nativeImage.createFromPath(getWindowIconPath());
-    if (icon.isEmpty()) return;
+    if (icon.isEmpty()) {
+      services.logService.error('系统托盘图标为空，已跳过创建');
+      return;
+    }
 
     const iconSize = getTrayIconSize(process.platform);
-    tray = new Tray(icon.resize({ width: iconSize, height: iconSize, quality: 'best' }));
+    const trayIcon = icon.resize({ width: iconSize, height: iconSize, quality: 'best' });
+    if (process.platform === 'darwin') {
+      trayIcon.setTemplateImage(true);
+    }
+    tray = new Tray(trayIcon);
     tray.setToolTip('PortBridge');
     tray.setContextMenu(
       Menu.buildFromTemplate([
