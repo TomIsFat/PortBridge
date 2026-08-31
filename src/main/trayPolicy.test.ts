@@ -6,7 +6,8 @@ import {
   shouldCloseToTray,
   shouldCreateTray,
   shouldHideDockWhenHidingWindow,
-  shouldQuitOnLastWindow
+  shouldQuitOnLastWindow,
+  shouldShowWindowOnTrayClick
 } from './trayPolicy';
 
 describe('shouldCreateTray', () => {
@@ -36,8 +37,8 @@ describe('isLinuxTrayReliable', () => {
 });
 
 describe('getTrayIconSize', () => {
-  it('uses a larger icon on macOS', () => {
-    assert.equal(getTrayIconSize('darwin'), 44);
+  it('uses the macOS menu bar point size', () => {
+    assert.equal(getTrayIconSize('darwin'), 22);
     assert.equal(getTrayIconSize('win32'), 16);
     assert.equal(getTrayIconSize('linux'), 16);
   });
@@ -70,5 +71,13 @@ describe('shouldHideDockWhenHidingWindow', () => {
     assert.equal(shouldHideDockWhenHidingWindow('darwin'), false);
     assert.equal(shouldHideDockWhenHidingWindow('win32'), false);
     assert.equal(shouldHideDockWhenHidingWindow('linux'), false);
+  });
+});
+
+describe('shouldShowWindowOnTrayClick', () => {
+  it('does not steal the macOS tray menu with a left click', () => {
+    assert.equal(shouldShowWindowOnTrayClick('darwin'), false);
+    assert.equal(shouldShowWindowOnTrayClick('win32'), true);
+    assert.equal(shouldShowWindowOnTrayClick('linux'), true);
   });
 });

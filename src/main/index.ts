@@ -1,4 +1,5 @@
 import { app, BrowserWindow, Menu, Tray, nativeImage } from 'electron';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createAppServices, registerIpcHandlers } from './ipc';
 import {
@@ -6,7 +7,8 @@ import {
   shouldCloseToTray,
   shouldCreateTray,
   shouldHideDockWhenHidingWindow,
-  shouldQuitOnLastWindow
+  shouldQuitOnLastWindow,
+  shouldShowWindowOnTrayClick
 } from './trayPolicy';
 
 let mainWindow: BrowserWindow | null = null;
@@ -16,6 +18,24 @@ const services = createAppServices();
 
 function getWindowIconPath(): string {
   return app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(process.cwd(), 'build/icon.png');
+}
+
+function getMacTrayIconPath(): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, 'trayTemplate@2x.png')
+    : join(process.cwd(), 'build/trayTemplate@2x.png');
+}
+
+function createTrayIcon(): Electron.NativeImage {
+  if (process.platform === 'darwin') {
+    const trayIcon = nativeImage.createFromBuffer(readFileSync(getMacTrayIconPath()), { scaleFactor: 2 });
+    trayIcon.setTemplateImage(true);
+    return trayIcon;
+  }
+
+  const icon = nativeImage.createFromPath(getWindowIconPath());
+  const iconSize = getTrayIconSize(process.platform);
+  return icon.resize({ width: iconSize, height: iconSize, quality: 'best' });
 }
 
 function setAppIcon(): void {
@@ -51,17 +71,12 @@ function createTray(): void {
   if (!shouldCreateTray(process.platform, process.env.XDG_CURRENT_DESKTOP)) return;
 
   try {
-    const icon = nativeImage.createFromPath(getWindowIconPath());
-    if (icon.isEmpty()) {
+    const trayIcon = createTrayIcon();
+    if (trayIcon.isEmpty()) {
       services.logService.error('系统托盘图标为空，已跳过创建');
       return;
     }
 
-    const iconSize = getTrayIconSize(process.platform);
-    const trayIcon = icon.resize({ width: iconSize, height: iconSize, quality: 'best' });
-    if (process.platform === 'darwin') {
-      trayIcon.setTemplateImage(true);
-    }
     tray = new Tray(trayIcon);
     tray.setToolTip('PortBridge');
     tray.setContextMenu(
@@ -71,8 +86,10 @@ function createTray(): void {
         { label: '退出', click: () => app.quit() }
       ])
     );
-    tray.on('click', showMainWindow);
-    tray.on('double-click', showMainWindow);
+    if (shouldShowWindowOnTrayClick(process.platform)) {
+      tray.on('click', showMainWindow);
+      tray.on('double-click', showMainWindow);
+    }
   } catch (error) {
     destroyTray();
     services.logService.error(error instanceof Error ? error.message : '创建系统托盘失败');
