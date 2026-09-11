@@ -38,8 +38,8 @@ export function LogPanel() {
   }, [logs.length, collapsed]);
 
   return (
-    <section className={cn('shrink-0 overflow-hidden border-t bg-card/95 backdrop-blur transition-[height]', collapsed ? 'h-10' : 'h-[220px]')}>
-      <div className="flex h-10 items-center justify-between px-3">
+    <section className={cn('flex shrink-0 flex-col overflow-hidden border-t bg-card/95 backdrop-blur transition-[height]', collapsed ? 'h-10' : 'h-[min(220px,40vh)]')}>
+      <div className="flex h-10 shrink-0 items-center justify-between px-3">
         <div className="flex items-center gap-2 text-sm font-medium">
           <TerminalSquare className="h-4 w-4 text-muted-foreground" />
           日志
@@ -67,7 +67,7 @@ export function LogPanel() {
       {!collapsed ? (
         <>
           <Separator />
-          <ScrollArea className="h-[178px]">
+          <ScrollArea className="min-h-0 flex-1">
             <div className="space-y-1 px-3 py-2 font-mono text-xs">
               {filteredLogs.map((log) => (
                 <div key={log.id} className="flex gap-2">
