@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import type { TunnelRule } from '@shared/types';
 import { checkPortSchema, createTunnelSchema, portSchema, type CreateTunnelInput } from '@shared/schemas';
+import { extractPortsFromName } from '@shared/namePorts';
 import { Button } from '@/components/ui/button';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -45,6 +46,14 @@ export function TunnelForm({ serverId, tunnel, onSubmit, onCancel }: TunnelFormP
     }
   });
 
+  // 实时从规则名称提取数字补全端口；名称中没有合法端口数字时不改动。
+  const applyPortsFromName = (name: string) => {
+    const suggested = extractPortsFromName(name);
+    if (!suggested) return;
+    form.setValue('localPort', String(suggested.localPort), { shouldValidate: false });
+    form.setValue('remotePort', String(suggested.remotePort), { shouldValidate: false });
+  };
+
   const checkPort = async () => {
     const localHost = form.getValues('localHost');
     const localPort = form.getValues('localPort');
@@ -73,7 +82,15 @@ export function TunnelForm({ serverId, tunnel, onSubmit, onCancel }: TunnelFormP
             <FormItem>
               <FormLabel>规则名称</FormLabel>
               <FormControl>
-                <Input autoFocus {...field} />
+                <Input
+                  autoFocus
+                  placeholder="如 mysql-3306，名称中的数字会实时补全到端口"
+                  {...field}
+                  onChange={(event) => {
+                    field.onChange(event.target.value);
+                    applyPortsFromName(event.target.value);
+                  }}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
