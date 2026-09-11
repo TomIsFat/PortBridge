@@ -180,6 +180,11 @@ npm run typecheck
 
 项目包含 `better-sqlite3` 原生依赖。如果要打对应平台的安装包，建议在对应系统环境执行打包，避免原生模块不匹配。
 
+在 Linux 上交叉构建 Windows 安装包（`npx electron-builder --win --x64`）需要额外处理：
+
+- `win.signAndEditExecutable` 已置为 `false`：跳过用 wine 运行 rcedit 给 exe 嵌图标/版本信息（不影响 NSIS 安装包自身图标）。
+- 生成 NSIS 安装包需要 wine 运行安装器提取卸载器。无 wine 的环境可把 `node_modules/app-builder-lib/out/targets/nsis/NsisTarget.js` 中 `execWine(...)` 那行替换为 `await nsisUtil_1.UninstallerReader.exec(installerPath, uninstallerPath);`（纯 JS 提取，npm install 后需重打该补丁）。
+
 ## 自动发布
 
 推送 `v*` 格式的 Git tag 会触发 GitHub Actions 自动打包并发布到 GitHub Release：

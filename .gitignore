@@ -4,6 +4,8 @@ dist/
 dist-electron/
 out/
 release/
+.cache/
+.npm-cache/
 .DS_Store
 *.log
 *.db
