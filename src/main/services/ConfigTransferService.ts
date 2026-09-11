@@ -51,6 +51,8 @@ const tunnelSchema = z.object({
   remoteHost: z.string().min(1),
   remotePort: z.number().int().min(1).max(65535),
   autoStart: z.boolean(),
+  // 旧版导出文件没有 sortOrder，缺省用 -1 标记“未排序”。
+  sortOrder: z.number().int().min(-1).default(-1),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1)
 });
@@ -331,11 +333,11 @@ export class ConfigTransferService {
         });
       }
 
-      plan.tunnelsToCreate.forEach((nextTunnel) => {
+      plan.tunnelsToCreate.forEach((nextTunnel, index) => {
         db.prepare(
           `INSERT INTO tunnels (
-            id, server_id, name, local_host, local_port, remote_host, remote_port, auto_start, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            id, server_id, name, local_host, local_port, remote_host, remote_port, auto_start, sort_order, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         ).run(
           nextTunnel.id,
           nextTunnel.serverId,
@@ -345,6 +347,7 @@ export class ConfigTransferService {
           nextTunnel.remoteHost,
           nextTunnel.remotePort,
           nextTunnel.autoStart ? 1 : 0,
+          nextTunnel.sortOrder >= 0 ? nextTunnel.sortOrder : Date.now() + index,
           nextTunnel.createdAt,
           nextTunnel.updatedAt
         );
@@ -478,10 +481,12 @@ export class ConfigTransferService {
         return;
       }
 
+      // 旧版导出文件没有 sortOrder，用 -1 标记“未排序”，写入时按文件顺序追加到末尾。
       const nextTunnel: TunnelRule = {
         ...tunnel,
         id: createId(),
         serverId,
+        sortOrder: tunnel.sortOrder ?? -1,
         createdAt: importedAt,
         updatedAt: importedAt
       };

@@ -34,6 +34,7 @@ declare global {
         listByServer: (serverId: string) => Promise<TunnelRule[]>;
         create: (input: CreateTunnelInput) => Promise<TunnelRule>;
         update: (input: UpdateTunnelInput) => Promise<TunnelRule>;
+        reorder: (serverId: string, orderedIds: string[]) => Promise<boolean>;
         delete: (id: string) => Promise<boolean>;
       };
       runtime: {

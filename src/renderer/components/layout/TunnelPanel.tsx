@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { FileKey, Network, Pencil, Play, Plus, RefreshCw, Server, Square, Trash2 } from 'lucide-react';
+import { useMemo, useState, type DragEvent } from 'react';
+import { FileKey, GripVertical, Network, Pencil, Play, Plus, RefreshCw, Server, Square, Trash2 } from 'lucide-react';
 import type { TunnelRule } from '@shared/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -11,12 +11,17 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { IconButton } from '@/components/common/IconButton';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { useAppStore } from '@/store/appStore';
+import { cn } from '@/lib/utils';
 
 export function TunnelPanel() {
   const store = useAppStore();
   const [open, setOpen] = useState(false);
   const [editingTunnel, setEditingTunnel] = useState<TunnelRule | undefined>();
   const [deleteTarget, setDeleteTarget] = useState<TunnelRule | undefined>();
+  // 拖拽排序状态：armed = 从手柄按下；dragging = 正在拖动；over = 当前悬停的落点。
+  const [armedId, setArmedId] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [overInfo, setOverInfo] = useState<{ id: string; place: 'before' | 'after' } | null>(null);
   const server = store.servers.find((item) => item.id === store.selectedServerId);
   const tunnels = useMemo(() => store.tunnels.filter((tunnel) => tunnel.serverId === store.selectedServerId), [store.tunnels, store.selectedServerId]);
   const jumpServerName = server?.jumpServerId
@@ -31,6 +36,45 @@ export function TunnelPanel() {
   const openEdit = (tunnel: TunnelRule) => {
     setEditingTunnel(tunnel);
     setOpen(true);
+  };
+
+  const resetDragState = () => {
+    setArmedId(null);
+    setDraggingId(null);
+    setOverInfo(null);
+  };
+
+  const handleDragStart = (event: DragEvent<HTMLTableRowElement>, tunnelId: string) => {
+    if (armedId !== tunnelId) {
+      event.preventDefault();
+      return;
+    }
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', tunnelId);
+    setDraggingId(tunnelId);
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLTableRowElement>, tunnelId: string) => {
+    if (!draggingId || draggingId === tunnelId) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    const rect = event.currentTarget.getBoundingClientRect();
+    const place = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+    setOverInfo({ id: tunnelId, place });
+  };
+
+  const handleDrop = () => {
+    const dragging = draggingId;
+    const over = overInfo;
+    resetDragState();
+    if (!server || !dragging || !over || dragging === over.id) return;
+
+    const ids = tunnels.map((tunnel) => tunnel.id);
+    ids.splice(ids.indexOf(dragging), 1);
+    let targetIndex = ids.indexOf(over.id);
+    if (over.place === 'after') targetIndex += 1;
+    ids.splice(targetIndex, 0, dragging);
+    void store.reorderTunnels(server.id, ids);
   };
 
   if (!server) {
@@ -75,6 +119,7 @@ export function TunnelPanel() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-8" aria-label="拖动排序" />
                 <TableHead className="w-[22%]">规则名称</TableHead>
                 <TableHead>本地监听</TableHead>
                 <TableHead>远程目标</TableHead>
@@ -89,7 +134,35 @@ export function TunnelPanel() {
                 const status = runtime?.status ?? 'stopped';
                 const isRunning = ['starting', 'running', 'reconnecting'].includes(status);
                 return (
-                  <TableRow key={tunnel.id}>
+                  <TableRow
+                    key={tunnel.id}
+                    draggable={armedId === tunnel.id}
+                    onDragStart={(event) => handleDragStart(event, tunnel.id)}
+                    onDragEnd={resetDragState}
+                    onDragOver={(event) => handleDragOver(event, tunnel.id)}
+                    onDragLeave={() => {
+                      if (overInfo?.id === tunnel.id) setOverInfo(null);
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      handleDrop();
+                    }}
+                    className={cn(
+                      draggingId === tunnel.id && 'opacity-40',
+                      overInfo?.id === tunnel.id && overInfo.place === 'before' && 'shadow-[inset_0_2px_0_0_#38bdf8]',
+                      overInfo?.id === tunnel.id && overInfo.place === 'after' && 'shadow-[inset_0_-2px_0_0_#38bdf8]'
+                    )}
+                  >
+                    <TableCell className="pl-2">
+                      <span
+                        className="block cursor-grab text-muted-foreground/50 hover:text-muted-foreground active:cursor-grabbing"
+                        onMouseDown={() => setArmedId(tunnel.id)}
+                        onMouseUp={() => setArmedId(null)}
+                        aria-label="拖动排序"
+                      >
+                        <GripVertical className="h-4 w-4" />
+                      </span>
+                    </TableCell>
                     <TableCell>
                       <div className="font-medium">{tunnel.name}</div>
                       {runtime?.error ? <div className="mt-1 line-clamp-1 text-xs text-destructive">{runtime.error}</div> : null}

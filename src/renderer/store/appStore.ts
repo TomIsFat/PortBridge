@@ -27,6 +27,7 @@ interface AppStore {
   deleteServer: (id: string) => Promise<void>;
   createTunnel: (input: CreateTunnelInput) => Promise<void>;
   updateTunnel: (input: UpdateTunnelInput) => Promise<void>;
+  reorderTunnels: (serverId: string, orderedIds: string[]) => Promise<void>;
   deleteTunnel: (id: string) => Promise<void>;
   startTunnel: (id: string) => Promise<void>;
   stopTunnel: (id: string) => Promise<void>;
@@ -162,6 +163,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   updateTunnel: async (input) => runAction(async () => {
     await electronApi.tunnels.update(input);
+    await get().loadAll();
+  }),
+
+  reorderTunnels: async (serverId, orderedIds) => runAction(async () => {
+    await electronApi.tunnels.reorder(serverId, orderedIds);
     await get().loadAll();
   }),
 

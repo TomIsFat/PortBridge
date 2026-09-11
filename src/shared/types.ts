@@ -37,6 +37,7 @@ export interface TunnelRule {
   remoteHost: string;
   remotePort: number;
   autoStart: boolean;
+  sortOrder: number;
   createdAt: string;
   updatedAt: string;
 }

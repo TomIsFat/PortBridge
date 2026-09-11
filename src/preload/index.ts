@@ -39,6 +39,7 @@ const api = {
     listByServer: (serverId: string) => invoke<TunnelRule[]>('tunnels:listByServer', { serverId }),
     create: (input: CreateTunnelInput) => invoke<TunnelRule>('tunnels:create', input),
     update: (input: UpdateTunnelInput) => invoke<TunnelRule>('tunnels:update', input),
+    reorder: (serverId: string, orderedIds: string[]) => invoke<boolean>('tunnels:reorder', { serverId, orderedIds }),
     delete: (id: string) => invoke<boolean>('tunnels:delete', { id })
   },
   runtime: {

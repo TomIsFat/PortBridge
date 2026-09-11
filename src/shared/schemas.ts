@@ -103,6 +103,11 @@ export const checkPortSchema = z.object({
   port: portSchema
 });
 
+export const reorderTunnelsSchema = z.object({
+  serverId: z.string().min(1),
+  orderedIds: z.array(z.string().min(1)).min(1)
+});
+
 export type CreateGroupInput = z.infer<typeof createGroupSchema>;
 export type UpdateGroupInput = z.infer<typeof updateGroupSchema>;
 export type CreateServerInput = z.infer<typeof createServerSchema>;

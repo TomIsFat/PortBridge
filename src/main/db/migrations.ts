@@ -41,6 +41,7 @@ export function runMigrations(db: Database.Database): void {
       remote_host TEXT NOT NULL DEFAULT '127.0.0.1',
       remote_port INTEGER NOT NULL,
       auto_start INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (server_id) REFERENCES servers(id)
@@ -53,5 +54,10 @@ export function runMigrations(db: Database.Database): void {
   }
   if (!serverColumns.some((column) => column.name === 'jump_server_id')) {
     db.exec('ALTER TABLE servers ADD COLUMN jump_server_id TEXT;');
+  }
+
+  const tunnelColumns = db.prepare('PRAGMA table_info(tunnels)').all() as Array<{ name: string }>;
+  if (!tunnelColumns.some((column) => column.name === 'sort_order')) {
+    db.exec('ALTER TABLE tunnels ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;');
   }
 }
