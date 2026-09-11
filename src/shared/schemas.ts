@@ -40,7 +40,12 @@ const serverBaseSchema = z.object({
   password: z.string().optional(),
   privateKey: z.string().optional(),
   privateKeyPath: z.string().optional(),
-  privateKeyPassphrase: z.string().optional()
+  privateKeyPassphrase: z.string().optional(),
+  // 表单下拉框用 'none' 表示“无跳板”，在这里统一归一为 undefined。
+  jumpServerId: z.preprocess(
+    (value) => (value === '' || value === 'none' || value == null ? undefined : value),
+    z.string().min(1).optional()
+  )
 });
 
 function validateServerAuth(value: z.infer<typeof serverBaseSchema>, ctx: z.RefinementCtx, requireSecret: boolean): void {

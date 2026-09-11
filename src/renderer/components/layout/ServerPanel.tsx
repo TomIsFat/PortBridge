@@ -60,6 +60,9 @@ export function ServerPanel() {
           <div className="space-y-2 p-2">
             {filteredServers.map((server) => {
               const serverTunnels = store.tunnels.filter((tunnel) => tunnel.serverId === server.id);
+              const jumpServerName = server.jumpServerId
+                ? store.servers.find((item) => item.id === server.jumpServerId)?.name
+                : undefined;
               const status = getServerStatus(server.id, serverTunnels.map((tunnel) => store.states[tunnel.id]?.status ?? 'stopped'));
               return (
                 <div
@@ -109,12 +112,18 @@ export function ServerPanel() {
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-                      <KeyRound className="h-3.5 w-3.5" />
+                      <KeyRound className="h-3.5 w-3.5 shrink-0" />
                       <span>{server.username}</span>
                       <span>·</span>
                       <span>{server.authType === 'password' ? '密码' : '私钥'}</span>
+                      {jumpServerName ? (
+                        <>
+                          <span>·</span>
+                          <span className="truncate">跳板：{jumpServerName}</span>
+                        </>
+                      ) : null}
                       <span>·</span>
-                      <span>{serverTunnels.length} 条</span>
+                      <span className="shrink-0">{serverTunnels.length} 条</span>
                     </div>
                     <StatusBadge status={status} />
                   </div>
@@ -133,6 +142,7 @@ export function ServerPanel() {
           <ServerForm
             key={editingServer?.id ?? 'create'}
             groups={store.groups}
+            servers={store.servers}
             server={editingServer}
             defaultGroupId={store.selectedGroupId === 'all' ? undefined : store.selectedGroupId}
             onCancel={() => setOpen(false)}

@@ -7,7 +7,7 @@ import type { Group, ServerConfig } from '@shared/types';
 import { createServerInputSchema, type CreateServerInput } from '@shared/schemas';
 import { Button } from '@/components/ui/button';
 import { DialogFooter } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,24 +15,30 @@ import { electronApi } from '@/api/electronApi';
 
 interface ServerFormProps {
   groups: Group[];
+  servers: ServerConfig[];
   server?: ServerConfig;
   defaultGroupId?: string;
   onSubmit: (input: CreateServerInput) => Promise<void>;
   onCancel: () => void;
 }
 
-type ServerFormInput = Omit<CreateServerInput, 'port'> & {
+const NONE_JUMP = 'none';
+
+type ServerFormInput = Omit<CreateServerInput, 'port' | 'jumpServerId'> & {
   port: string;
+  jumpServerId: string;
 };
 
-export function ServerForm({ groups, server, defaultGroupId, onSubmit, onCancel }: ServerFormProps) {
+export function ServerForm({ groups, servers, server, defaultGroupId, onSubmit, onCancel }: ServerFormProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [testing, setTesting] = useState(false);
   const defaultPort = server?.port ?? 22;
+  // 表单内 jumpServerId 用 'none' 表示无跳板，schema 的 preprocess 会归一为 undefined。
   const serverFormSchema = useMemo(() => createServerInputSchema({
     defaultPort,
     requireSecret: !server
   }), [defaultPort, server]);
+  const jumpOptions = useMemo(() => servers.filter((item) => item.id !== server?.id), [servers, server]);
 
   const form = useForm<ServerFormInput>({
     resolver: zodResolver(serverFormSchema) as Resolver<ServerFormInput>,
@@ -46,7 +52,8 @@ export function ServerForm({ groups, server, defaultGroupId, onSubmit, onCancel 
       password: '',
       privateKey: '',
       privateKeyPath: server?.privateKeyPath ?? '',
-      privateKeyPassphrase: ''
+      privateKeyPassphrase: '',
+      jumpServerId: server?.jumpServerId ?? NONE_JUMP
     }
   });
   const authType = form.watch('authType');
@@ -156,6 +163,33 @@ export function ServerForm({ groups, server, defaultGroupId, onSubmit, onCancel 
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="jumpServerId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>跳板机</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="无（直连）" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value={NONE_JUMP}>无（直连）</SelectItem>
+                  {jumpOptions.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name}（{item.host}:{item.port}）
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormDescription>可选。先登录跳板机，再经它转发到本服务器（ProxyJump）。</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <div className="grid grid-cols-2 gap-4">
           <FormField

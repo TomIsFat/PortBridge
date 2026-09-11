@@ -20,6 +20,8 @@ export interface ServerConfig {
   privateKey?: string;
   privateKeyPath?: string;
   privateKeyPassphrase?: string;
+  /** 跳板机（ProxyJump）：先连该服务器，再经它转发到本服务器。可选。 */
+  jumpServerId?: string;
   autoReconnect: boolean;
   reconnectInterval: number;
   createdAt: string;

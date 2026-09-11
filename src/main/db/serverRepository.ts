@@ -17,9 +17,12 @@ interface ServerRow {
   private_key_passphrase?: string;
   auto_reconnect: number;
   reconnect_interval: number;
+  jump_server_id?: string;
   created_at: string;
   updated_at: string;
 }
+
+const MAX_JUMP_DEPTH = 8;
 
 function mapServer(row: ServerRow): ServerConfig {
   return {
@@ -34,11 +37,28 @@ function mapServer(row: ServerRow): ServerConfig {
     privateKey: row.private_key ?? undefined,
     privateKeyPath: row.private_key_path ?? undefined,
     privateKeyPassphrase: row.private_key_passphrase ?? undefined,
+    jumpServerId: row.jump_server_id ?? undefined,
     autoReconnect: Boolean(row.auto_reconnect),
     reconnectInterval: row.reconnect_interval,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
+}
+
+export function assertNoJumpCycle(getServer: (id: string) => ServerConfig | undefined, selfId?: string, jumpServerId?: string): void {
+  if (!jumpServerId) return;
+  if (selfId && jumpServerId === selfId) throw new Error('跳板机不能选择自身');
+
+  const seen = new Set<string>(selfId ? [selfId] : []);
+  let currentId: string | undefined = jumpServerId;
+  let depth = 0;
+  while (currentId) {
+    if (seen.has(currentId)) throw new Error('跳板机链路存在循环，请检查配置');
+    seen.add(currentId);
+    depth += 1;
+    if (depth > MAX_JUMP_DEPTH) throw new Error('跳板机链路过长（最多支持 8 级）');
+    currentId = getServer(currentId)?.jumpServerId;
+  }
 }
 
 function publicServer(server: ServerConfig): ServerConfig {
@@ -82,12 +102,13 @@ export class ServerRepository {
   create(input: CreateServerInput): ServerConfig {
     const createdAt = nowIso();
     const id = createId();
+    assertNoJumpCycle((serverId) => this.get(serverId, true), id, input.jumpServerId);
     getDatabase()
       .prepare(
         `INSERT INTO servers (
           id, group_id, name, host, port, username, auth_type, password, private_key, private_key_path,
-          private_key_passphrase, auto_reconnect, reconnect_interval, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          private_key_passphrase, jump_server_id, auto_reconnect, reconnect_interval, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
@@ -101,6 +122,7 @@ export class ServerRepository {
         input.authType === 'privateKey' ? input.privateKey : null,
         input.authType === 'privateKey' ? input.privateKeyPath : null,
         input.authType === 'privateKey' ? input.privateKeyPassphrase : null,
+        input.jumpServerId ?? null,
         1,
         3000,
         createdAt,
@@ -142,11 +164,14 @@ export class ServerRepository {
       throw new Error('请填写私钥内容或选择私钥文件');
     }
 
+    assertNoJumpCycle((serverId) => this.get(serverId, true), input.id, input.jumpServerId);
+
     getDatabase()
       .prepare(
         `UPDATE servers SET
           group_id = ?, name = ?, host = ?, port = ?, username = ?, auth_type = ?, password = ?,
-          private_key = ?, private_key_path = ?, private_key_passphrase = ?, auto_reconnect = ?, reconnect_interval = ?, updated_at = ?
+          private_key = ?, private_key_path = ?, private_key_passphrase = ?, jump_server_id = ?,
+          auto_reconnect = ?, reconnect_interval = ?, updated_at = ?
         WHERE id = ?`
       )
       .run(
@@ -160,6 +185,7 @@ export class ServerRepository {
         input.authType === 'privateKey' ? privateKey : null,
         input.authType === 'privateKey' ? privateKeyPath : null,
         input.authType === 'privateKey' ? privateKeyPassphrase : null,
+        input.jumpServerId ?? null,
         1,
         3000,
         updatedAt,
@@ -174,6 +200,7 @@ export class ServerRepository {
     const db = getDatabase();
     const transaction = db.transaction(() => {
       db.prepare('DELETE FROM tunnels WHERE server_id = ?').run(id);
+      db.prepare('UPDATE servers SET jump_server_id = NULL WHERE jump_server_id = ?').run(id);
       db.prepare('DELETE FROM servers WHERE id = ?').run(id);
     });
     transaction();

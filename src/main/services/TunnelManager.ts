@@ -1,17 +1,19 @@
-import fs from 'node:fs';
 import net from 'node:net';
 import { BrowserWindow } from 'electron';
-import { Client, type ConnectConfig } from 'ssh2';
-import type { ServerConfig, TunnelRuntimeState, TunnelStatus } from '../../shared/types';
+import { Client } from 'ssh2';
+import type { TunnelRuntimeState, TunnelStatus } from '../../shared/types';
 import { ServerRepository } from '../db/serverRepository';
 import { TunnelRepository } from '../db/tunnelRepository';
 import type { LogService } from './LogService';
 import { attachLocalForwardSocket } from './forwardSocket';
+import { describeJumpPath } from './jumpChain';
+import { closeSshClient, connectWithJump } from './sshConnect';
 
 interface RuntimeTunnel {
   tunnelId: string;
   serverId: string;
   sshClient?: Client;
+  jumpClients?: Client[];
   localServer?: net.Server;
   localSockets?: Set<net.Socket>;
   status: TunnelStatus;
@@ -43,15 +45,6 @@ function closeServer(server?: net.Server): Promise<void> {
       resolve();
     }
   });
-}
-
-function closeSshClient(ssh?: Client): void {
-  if (!ssh) return;
-  ssh.on('error', () => {
-    // Keep late ssh2 errors from escaping after the tunnel lifecycle moved on.
-  });
-  ssh.end();
-  ssh.destroy();
 }
 
 async function closeLocalForward(server?: net.Server, sockets?: Set<net.Socket>): Promise<void> {
@@ -154,7 +147,6 @@ export class TunnelManager {
     existing.error = undefined;
     existing.status = 'starting';
     this.emitState(existing);
-    this.logService.info(`启动映射 ${tunnel.name} ${tunnel.localHost}:${tunnel.localPort} -> ${tunnel.remoteHost}:${tunnel.remotePort}`);
 
     const ssh = new Client();
     existing.sshClient = ssh;
@@ -163,7 +155,12 @@ export class TunnelManager {
     });
 
     try {
-      await this.connectSsh(ssh, server);
+      const { jumpClients, chain } = await connectWithJump(ssh, server, (id) => this.serverRepository.get(id, true));
+      existing.jumpClients = jumpClients;
+      const jumpPath = describeJumpPath(chain);
+      this.logService.info(
+        `启动映射 ${tunnel.name} ${tunnel.localHost}:${tunnel.localPort} -> ${tunnel.remoteHost}:${tunnel.remotePort}${jumpPath ? `（经跳板 ${jumpPath}）` : ''}`
+      );
       const localForward = await createLocalForward(ssh, tunnel.localHost, tunnel.localPort, tunnel.remoteHost, tunnel.remotePort);
       existing.localServer = localForward.server;
       existing.localSockets = localForward.sockets;
@@ -271,62 +268,16 @@ export class TunnelManager {
     const localServer = runtime.localServer;
     const localSockets = runtime.localSockets;
     const sshClient = runtime.sshClient;
+    const jumpClients = runtime.jumpClients;
 
     runtime.localServer = undefined;
     runtime.localSockets = undefined;
     runtime.sshClient = undefined;
+    runtime.jumpClients = undefined;
 
+    for (const client of jumpClients ?? []) closeSshClient(client);
     closeSshClient(sshClient);
     await closeLocalForward(localServer, localSockets);
-  }
-
-  private connectSsh(ssh: Client, server: ServerConfig): Promise<void> {
-    const config: ConnectConfig = {
-      host: server.host,
-      port: server.port,
-      username: server.username,
-      readyTimeout: 15000,
-      keepaliveInterval: 30000,
-      keepaliveCountMax: 3
-    };
-
-    if (server.authType === 'password') {
-      config.password = server.password;
-    } else {
-      if (server.privateKey?.trim()) {
-        config.privateKey = server.privateKey;
-      } else if (server.privateKeyPath && fs.existsSync(server.privateKeyPath)) {
-        config.privateKey = fs.readFileSync(server.privateKeyPath, 'utf8');
-      } else {
-        throw new Error('私钥文件不存在');
-      }
-      config.passphrase = server.privateKeyPassphrase || undefined;
-    }
-
-    return new Promise((resolve, reject) => {
-      const cleanup = (): void => {
-        ssh.off('ready', onReady);
-        ssh.off('error', onError);
-        ssh.off('close', onClose);
-      };
-      const onReady = (): void => {
-        cleanup();
-        resolve();
-      };
-      const onError = (error: Error): void => {
-        cleanup();
-        reject(error);
-      };
-      const onClose = (): void => {
-        cleanup();
-        reject(new Error('SSH 连接在握手完成前断开'));
-      };
-
-      ssh.once('ready', onReady);
-      ssh.once('error', onError);
-      ssh.once('close', onClose);
-      ssh.connect(config);
-    });
   }
 
   private bindRuntimeEvents(runtime: RuntimeTunnel): void {

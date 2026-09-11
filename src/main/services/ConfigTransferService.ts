@@ -35,6 +35,7 @@ const serverSchema = z.object({
   privateKey: z.string().optional(),
   privateKeyPath: z.string().optional(),
   privateKeyPassphrase: z.string().optional(),
+  jumpServerId: z.string().min(1).optional(),
   autoReconnect: z.boolean(),
   reconnectInterval: z.number().int().min(1),
   createdAt: z.string().min(1),
@@ -169,6 +170,7 @@ function sameServerContent(left: ServerConfig, right: ServerConfig): boolean {
     && (left.privateKey ?? '') === (right.privateKey ?? '')
     && (left.privateKeyPath ?? '') === (right.privateKeyPath ?? '')
     && (left.privateKeyPassphrase ?? '') === (right.privateKeyPassphrase ?? '')
+    && (left.jumpServerId ?? '') === (right.jumpServerId ?? '')
     && left.autoReconnect === right.autoReconnect
     && left.reconnectInterval === right.reconnectInterval;
 }
@@ -279,8 +281,8 @@ export class ConfigTransferService {
         db.prepare(
           `INSERT INTO servers (
             id, group_id, name, host, port, username, auth_type, password, private_key, private_key_path,
-            private_key_passphrase, auto_reconnect, reconnect_interval, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            private_key_passphrase, jump_server_id, auto_reconnect, reconnect_interval, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         ).run(
           nextServer.id,
           nextServer.groupId,
@@ -293,6 +295,7 @@ export class ConfigTransferService {
           nextServer.authType === 'privateKey' ? nextServer.privateKey ?? null : null,
           nextServer.authType === 'privateKey' ? nextServer.privateKeyPath ?? null : null,
           nextServer.authType === 'privateKey' ? nextServer.privateKeyPassphrase ?? null : null,
+          nextServer.jumpServerId ?? null,
           nextServer.autoReconnect ? 1 : 0,
           nextServer.reconnectInterval,
           nextServer.createdAt,
@@ -305,7 +308,8 @@ export class ConfigTransferService {
           db.prepare(
             `UPDATE servers SET
               group_id = ?, name = ?, host = ?, port = ?, username = ?, auth_type = ?, password = ?,
-              private_key = ?, private_key_path = ?, private_key_passphrase = ?, auto_reconnect = ?, reconnect_interval = ?, updated_at = ?
+              private_key = ?, private_key_path = ?, private_key_passphrase = ?, jump_server_id = ?,
+              auto_reconnect = ?, reconnect_interval = ?, updated_at = ?
             WHERE id = ?`
           ).run(
             current.groupId,
@@ -318,6 +322,7 @@ export class ConfigTransferService {
             incoming.authType === 'privateKey' ? incoming.privateKey ?? null : null,
             incoming.authType === 'privateKey' ? incoming.privateKeyPath ?? null : null,
             incoming.authType === 'privateKey' ? incoming.privateKeyPassphrase ?? null : null,
+            incoming.jumpServerId ?? null,
             incoming.autoReconnect ? 1 : 0,
             incoming.reconnectInterval,
             importedAt,
@@ -417,25 +422,37 @@ export class ConfigTransferService {
       groupIdMap.set(group.id, nextGroup.id);
     });
 
+    // 第一遍：先确定文件内所有服务器对应的本地 id，跳板引用才能在第二遍重映射。
+    const localIdByFileId = new Map<string, string>();
+    data.servers.forEach((server) => {
+      const groupId = groupIdMap.get(server.groupId);
+      if (!groupId) return;
+      const current = servers.find((item) => item.groupId === groupId && sameName(item.name, server.name));
+      localIdByFileId.set(server.id, current ? current.id : createId());
+    });
+
     data.servers.forEach((server) => {
       const groupId = groupIdMap.get(server.groupId);
       if (!groupId) return;
 
+      const remappedJump = server.jumpServerId ? localIdByFileId.get(server.jumpServerId) : undefined;
+      const remappedServer: ServerConfig = { ...server, jumpServerId: remappedJump };
+
       const current = servers.find((item) => item.groupId === groupId && sameName(item.name, server.name));
       if (current) {
         serverIdMap.set(server.id, current.id);
-        if (sameServerContent(server, current)) {
+        if (sameServerContent(remappedServer, current)) {
           skippedServers += 1;
         } else {
           conflicts.push({ type: 'server', name: current.name, parentName: groups.find((group) => group.id === groupId)?.name ?? '未分组' });
-          serversToUpdate.push({ current, incoming: server });
+          serversToUpdate.push({ current, incoming: remappedServer });
         }
         return;
       }
 
       const nextServer: ServerConfig = {
-        ...server,
-        id: createId(),
+        ...remappedServer,
+        id: localIdByFileId.get(server.id) as string,
         groupId,
         createdAt: importedAt,
         updatedAt: importedAt

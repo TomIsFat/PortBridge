@@ -26,6 +26,7 @@ export function runMigrations(db: Database.Database): void {
       private_key_passphrase TEXT,
       auto_reconnect INTEGER NOT NULL DEFAULT 1,
       reconnect_interval INTEGER NOT NULL DEFAULT 3000,
+      jump_server_id TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (group_id) REFERENCES groups(id)
@@ -46,8 +47,11 @@ export function runMigrations(db: Database.Database): void {
     );
   `);
 
-  const columns = db.prepare('PRAGMA table_info(servers)').all() as Array<{ name: string }>;
-  if (!columns.some((column) => column.name === 'private_key')) {
+  const serverColumns = db.prepare('PRAGMA table_info(servers)').all() as Array<{ name: string }>;
+  if (!serverColumns.some((column) => column.name === 'private_key')) {
     db.exec('ALTER TABLE servers ADD COLUMN private_key TEXT;');
+  }
+  if (!serverColumns.some((column) => column.name === 'jump_server_id')) {
+    db.exec('ALTER TABLE servers ADD COLUMN jump_server_id TEXT;');
   }
 }

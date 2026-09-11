@@ -19,6 +19,9 @@ export function TunnelPanel() {
   const [deleteTarget, setDeleteTarget] = useState<TunnelRule | undefined>();
   const server = store.servers.find((item) => item.id === store.selectedServerId);
   const tunnels = useMemo(() => store.tunnels.filter((tunnel) => tunnel.serverId === store.selectedServerId), [store.tunnels, store.selectedServerId]);
+  const jumpServerName = server?.jumpServerId
+    ? store.servers.find((item) => item.id === server.jumpServerId)?.name
+    : undefined;
 
   const openCreate = () => {
     setEditingTunnel(undefined);
@@ -43,8 +46,11 @@ export function TunnelPanel() {
             <span className="rounded-md border px-1.5 py-0.5 text-xs text-muted-foreground">{server.authType === 'password' ? '密码' : '私钥'}</span>
           </div>
           <div className="mt-1 flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
-            <FileKey className="h-3.5 w-3.5" />
+            <FileKey className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">{server.username}@{server.host}:{server.port}</span>
+            {jumpServerName ? (
+              <span className="shrink-0 rounded-md border px-1.5 py-0.5 font-sans">via {jumpServerName}</span>
+            ) : null}
           </div>
         </div>
         <div className="flex items-center gap-2">

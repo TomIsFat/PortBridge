@@ -41,6 +41,6 @@ export function registerIpcHandlers(services: AppServices): void {
   registerGroupHandlers(services.groupRepository, services.tunnelManager);
   registerServerHandlers(services.serverRepository, services.tunnelManager);
   registerTunnelHandlers(services.tunnelRepository, services.tunnelManager);
-  registerRuntimeHandlers(services.tunnelManager, services.logService);
+  registerRuntimeHandlers(services.tunnelManager, services.logService, services.serverRepository);
   registerConfigHandlers(services.configTransferService);
 }
